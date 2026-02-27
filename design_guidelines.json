@@ -1,0 +1,135 @@
+{
+  "brand_identity": {
+    "name": "ConstructIQ",
+    "theme_name": "Structural Integrity",
+    "archetype": "The Architect (Swiss & High-Contrast)",
+    "core_values": ["Precision", "Durability", "Clarity", "Safety"],
+    "emotional_tone": "Robust, Industrial, Trustworthy, Data-Dense"
+  },
+  "color_system": {
+    "strategy": "High visibility accents against structural neutrals. Think 'Safety Orange' and 'Steel Beam' on 'Concrete'.",
+    "palette": {
+      "background": "hsl(210, 20%, 98%)", 
+      "foreground": "hsl(222, 47%, 11%)",
+      "card": "hsl(0, 0%, 100%)",
+      "card_foreground": "hsl(222, 47%, 11%)",
+      "popover": "hsl(0, 0%, 100%)",
+      "popover_foreground": "hsl(222, 47%, 11%)",
+      "primary": "hsl(222, 47%, 11%)", 
+      "primary_foreground": "hsl(210, 40%, 98%)",
+      "secondary": "hsl(210, 40%, 96.1%)",
+      "secondary_foreground": "hsl(222, 47%, 11%)",
+      "muted": "hsl(210, 40%, 96.1%)",
+      "muted_foreground": "hsl(215.4, 16.3%, 46.9%)",
+      "accent": "hsl(24, 95%, 53%)", 
+      "accent_foreground": "hsl(0, 0%, 98%)",
+      "destructive": "hsl(0, 84.2%, 60.2%)",
+      "destructive_foreground": "hsl(210, 40%, 98%)",
+      "border": "hsl(214.3, 31.8%, 91.4%)",
+      "input": "hsl(214.3, 31.8%, 91.4%)",
+      "ring": "hsl(222, 47%, 11%)"
+    },
+    "semantic_usage": {
+      "primary": "Main actions, Navigation Sidebar, Headings",
+      "accent": "Call to Actions (RFQs), Urgent Alerts, 'Safety' highlights",
+      "muted": "Backgrounds for secondary areas, inactive tabs",
+      "border": "Hard structural lines defining the grid"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Manrope, sans-serif",
+      "body": "Public Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scaling": {
+      "h1": "text-4xl font-bold tracking-tight lg:text-5xl",
+      "h2": "text-3xl font-semibold tracking-tight",
+      "h3": "text-2xl font-semibold tracking-tight",
+      "body": "text-sm leading-relaxed",
+      "small": "text-xs font-medium leading-none"
+    },
+    "rules": [
+      "Headings must use Manrope. It feels engineered.",
+      "Data tables must use Public Sans for numbers for readability.",
+      "SKUs and Reference IDs must use JetBrains Mono.",
+      "Never center text unless it is a standalone metric."
+    ]
+  },
+  "spacing_layout": {
+    "grid_system": "The Blueprint Grid",
+    "container_padding": "p-6 md:p-8 lg:p-12",
+    "component_spacing": "gap-6",
+    "rules": [
+      "Use explicit borders to define space, not just whitespace.",
+      "Dashboard widgets must align perfectly to the grid.",
+      "Forms should be narrow and focused (max-w-2xl) to avoid eye-travel fatigue."
+    ]
+  },
+  "ui_components": {
+    "buttons": {
+      "style": "Sharp or slightly rounded (rounded-md). No pill shapes.",
+      "primary": "bg-primary text-primary-foreground hover:bg-slate-800 shadow-sm",
+      "secondary": "bg-white border border-input hover:bg-accent hover:text-accent-foreground"
+    },
+    "cards": {
+      "style": "Flat, bordered, minimal shadow. rounded-lg border-slate-200 shadow-sm",
+      "hover": "hover:shadow-md transition-shadow duration-200"
+    },
+    "tables": {
+      "style": "Dense, distinct header. Header bg-slate-50 border-b border-slate-200. Font-mono for IDs.",
+      "row": "hover:bg-slate-50 transition-colors"
+    },
+    "forms": {
+      "input": "bg-white border-slate-300 focus:ring-2 focus:ring-slate-400 focus:border-slate-400 rounded-md",
+      "label": "text-sm font-medium text-slate-700 mb-1.5 block"
+    }
+  },
+  "visual_assets": {
+    "images": {
+      "auth_background": {
+        "url": "https://images.pexels.com/photos/16600072/pexels-photo-16600072.jpeg",
+        "alt": "Orange tower crane against blue sky",
+        "overlay": "bg-slate-900/60 mix-blend-multiply"
+      },
+      "dashboard_hero": {
+        "url": "https://images.pexels.com/photos/4458203/pexels-photo-4458203.jpeg",
+        "alt": "Detailed architectural blueprints",
+        "opacity": "opacity-10"
+      },
+      "empty_states": [
+        "https://images.pexels.com/photos/6615086/pexels-photo-6615086.jpeg"
+      ]
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px (Thin/Technical)"
+    }
+  },
+  "tech_stack_specifics": {
+    "framework": "React (JS)",
+    "styling": "Tailwind CSS + Shadcn UI",
+    "charts": "Recharts (Customize to match theme colors)",
+    "file_extension": ".js / .jsx",
+    "instructions": [
+      "Use Shadcn components as the base but override rounded-xl with rounded-lg or rounded-md.",
+      "Use Recharts ResponsiveContainer for all charts.",
+      "Implement server-side pagination for all tables using TanStack Table (if available) or manual state."
+    ]
+  },
+  "universal_guidelines": [
+    "NO gradients on buttons. Flat colors only.",
+    "NO blurry drop shadows. Use crisp borders.",
+    "Data density is a feature. Do not use excessive whitespace in tables.",
+    "All prices must be right-aligned.",
+    "Status badges must use subtle backgrounds (bg-blue-100 text-blue-800) not solid blocks.",
+    "Interactive elements must have a data-testid attribute."
+  ],
+  "instructions_to_main_agent": {
+    "step_1": "Update globals.css (or index.css) with the HSL color values provided in color_system.",
+    "step_2": "Install fonts: Manrope and Public Sans via Google Fonts (import in index.css).",
+    "step_3": "Create a Layout component that implements the Sidebar + Header structure.",
+    "step_4": "Build the Dashboard using the 'Blueprint Grid' strategy.",
+    "step_5": "When building tables, ensure columns have fixed widths where possible to prevent jumping."
+  }
+}

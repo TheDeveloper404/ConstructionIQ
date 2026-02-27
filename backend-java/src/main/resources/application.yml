@@ -1,0 +1,28 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: constructiq-backend-java
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/procurement_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+constructiq:
+  demo-mode: ${DEMO_MODE:true}
+  demo-org-id: ${DEMO_ORG_ID:demo-org-001}
+  demo-user-id: ${DEMO_USER_ID:demo-user-001}
+  cors-origins: ${CORS_ORIGINS:*}
+  sender-email: ${SENDER_EMAIL:onboarding@resend.dev}
+  resend-api-key: ${RESEND_API_KEY:}
