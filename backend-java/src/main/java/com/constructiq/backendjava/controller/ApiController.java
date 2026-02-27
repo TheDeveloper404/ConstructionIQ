@@ -678,7 +678,14 @@ public class ApiController {
 
         Map<String, String> supplierMap = new HashMap<>();
         if (!supplierIds.isEmpty()) {
-            List<Map<String, Object>> suppliers = store.find("suppliers", Map.of("id", Map.of("$in", new ArrayList<>(supplierIds))), null, false, 0, 100);
+            List<Map<String, Object>> suppliers = store.find(
+                    "suppliers",
+                    Map.of("org_id", ctx.orgId(), "id", Map.of("$in", new ArrayList<>(supplierIds))),
+                    null,
+                    false,
+                    0,
+                    100
+            );
             for (Map<String, Object> s : suppliers) {
                 supplierMap.put(asString(s.get("id"), ""), asString(s.get("name"), "Unknown"));
             }
@@ -758,7 +765,14 @@ public class ApiController {
 
         Map<String, String> productMap = new HashMap<>();
         if (!productIds.isEmpty()) {
-            List<Map<String, Object>> products = store.find("normalized_products", Map.of("id", Map.of("$in", new ArrayList<>(productIds))), null, false, 0, 100);
+            List<Map<String, Object>> products = store.find(
+                    "normalized_products",
+                    Map.of("org_id", ctx.orgId(), "id", Map.of("$in", new ArrayList<>(productIds))),
+                    null,
+                    false,
+                    0,
+                    100
+            );
             for (Map<String, Object> p : products) {
                 productMap.put(asString(p.get("id"), ""), asString(p.get("canonical_name"), "Unknown"));
             }
@@ -843,7 +857,14 @@ public class ApiController {
         Set<String> supplierIds = quotes.stream().map(q -> asString(q.get("supplier_id"), "")).filter(s -> !s.isBlank()).collect(Collectors.toSet());
         Map<String, String> supplierMap = new HashMap<>();
         if (!supplierIds.isEmpty()) {
-            List<Map<String, Object>> suppliers = store.find("suppliers", Map.of("id", Map.of("$in", new ArrayList<>(supplierIds))), null, false, 0, 100);
+            List<Map<String, Object>> suppliers = store.find(
+                    "suppliers",
+                    Map.of("org_id", ctx.orgId(), "id", Map.of("$in", new ArrayList<>(supplierIds))),
+                    null,
+                    false,
+                    0,
+                    100
+            );
             for (Map<String, Object> s : suppliers) {
                 supplierMap.put(asString(s.get("id"), ""), asString(s.get("name"), "Unknown"));
             }
