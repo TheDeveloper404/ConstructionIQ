@@ -5,8 +5,11 @@ import com.constructiq.backendjava.model.DemoContext;
 import com.constructiq.backendjava.security.AuthContext;
 import com.constructiq.backendjava.security.AuthContextHolder;
 import com.constructiq.backendjava.security.AuthTokenService;
+import com.constructiq.backendjava.security.PasswordService;
 import com.constructiq.backendjava.store.SqlDocumentStore;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,11 +31,18 @@ public class ApiController {
     private final SqlDocumentStore store;
     private final ConstructIQProperties properties;
     private final AuthTokenService tokenService;
+    private final PasswordService passwordService;
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
 
-    public ApiController(SqlDocumentStore store, ConstructIQProperties properties, AuthTokenService tokenService) {
+    public ApiController(SqlDocumentStore store,
+                         ConstructIQProperties properties,
+                         AuthTokenService tokenService,
+                         PasswordService passwordService) {
         this.store = store;
         this.properties = properties;
         this.tokenService = tokenService;
+        this.passwordService = passwordService;
     }
 
     @PostConstruct
@@ -82,6 +92,12 @@ public class ApiController {
     private void requireAdmin(DemoContext ctx) {
         if (!"admin".equalsIgnoreCase(ctx.userRole())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
+        }
+    }
+
+    private void metricLogin(String outcome) {
+        if (meterRegistry != null) {
+            meterRegistry.counter("constructiq_auth_login_total", "outcome", outcome).increment();
         }
     }
 
@@ -172,11 +188,12 @@ public class ApiController {
         String email = asString(data.get("email"), "").trim().toLowerCase(Locale.ROOT);
         String password = asString(data.get("password"), "");
         if (email.isBlank() || password.isBlank()) {
+            metricLogin("bad_request");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email and password are required");
         }
 
         boolean defaultAdmin = email.equalsIgnoreCase(properties.getAdminEmail())
-                && password.equals(properties.getAdminPassword());
+                && passwordService.matches(password, properties.getAdminPassword());
 
         String orgId = properties.getDemoOrgId();
         String userId = properties.getDemoUserId();
@@ -192,11 +209,13 @@ public class ApiController {
                     1
             );
             if (users.isEmpty()) {
+                metricLogin("unauthorized");
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
             }
             Map<String, Object> user = users.get(0);
             String storedPassword = asString(user.get("password"), "");
-            if (!storedPassword.isBlank() && !storedPassword.equals(password)) {
+            if (!passwordService.matches(password, storedPassword)) {
+                metricLogin("unauthorized");
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
             }
             orgId = asString(user.get("org_id"), orgId);
@@ -205,6 +224,7 @@ public class ApiController {
         }
 
         String token = tokenService.createToken(userId, orgId, role, email);
+        metricLogin("success");
         return Map.of(
                 "access_token", token,
                 "token_type", "bearer",
@@ -1082,9 +1102,21 @@ public class ApiController {
                     "email", "demo@constructiq.com",
                     "name", "Demo Admin",
                     "role", "admin",
+                    "password", passwordService.hashIfPlaintext("demo123"),
                     "status", "active",
                     "created_at", nowIso()
             )));
+        } else {
+            Map<String, Object> existingUser = store.findOne("users", userId).orElse(new LinkedHashMap<>());
+            String existingPassword = asString(existingUser.get("password"), "");
+            if (existingPassword.isBlank()) {
+                store.updateByQuery(
+                        "users",
+                        Map.of("id", userId, "org_id", orgId),
+                        Map.of("password", passwordService.hashIfPlaintext("demo123"), "updated_at", nowIso()),
+                        true
+                );
+            }
         }
 
         if (store.count("projects", Map.of("org_id", orgId)) == 0) {

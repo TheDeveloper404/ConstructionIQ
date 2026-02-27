@@ -11,6 +11,7 @@ public class ConstructIQProperties {
     private String senderEmail = "onboarding@resend.dev";
     private String resendApiKey = "";
     private String authTokenSecret = "change-this-secret";
+    private String authTokenPreviousSecrets = "";
     private long authTokenTtlMinutes = 480;
     private String adminEmail = "admin@constructiq.local";
     private String adminPassword = "admin123";
@@ -72,6 +73,14 @@ public class ConstructIQProperties {
 
     public void setAuthTokenSecret(String authTokenSecret) {
         this.authTokenSecret = authTokenSecret;
+    }
+
+    public String getAuthTokenPreviousSecrets() {
+        return authTokenPreviousSecrets;
+    }
+
+    public void setAuthTokenPreviousSecrets(String authTokenPreviousSecrets) {
+        this.authTokenPreviousSecrets = authTokenPreviousSecrets;
     }
 
     public long getAuthTokenTtlMinutes() {

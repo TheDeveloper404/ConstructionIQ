@@ -21,7 +21,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 constructiq:
   demo-mode: ${DEMO_MODE:true}
@@ -31,6 +31,7 @@ constructiq:
   sender-email: ${SENDER_EMAIL:onboarding@resend.dev}
   resend-api-key: ${RESEND_API_KEY:}
   auth-token-secret: ${AUTH_TOKEN_SECRET:change-this-secret}
+  auth-token-previous-secrets: ${AUTH_TOKEN_PREVIOUS_SECRETS:}
   auth-token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:480}
   admin-email: ${ADMIN_EMAIL:admin@constructiq.local}
   admin-password: ${ADMIN_PASSWORD:admin123}

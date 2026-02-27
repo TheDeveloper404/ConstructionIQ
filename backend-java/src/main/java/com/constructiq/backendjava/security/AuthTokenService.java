@@ -9,6 +9,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,8 +55,7 @@ public class AuthTokenService {
             }
 
             String signingInput = parts[0] + "." + parts[1];
-            String expectedSignature = b64Url(sign(signingInput));
-            if (!expectedSignature.equals(parts[2])) {
+            if (!isSignatureValid(signingInput, parts[2])) {
                 return Optional.empty();
             }
 
@@ -81,9 +81,39 @@ public class AuthTokenService {
     }
 
     private byte[] sign(String content) throws Exception {
+        return sign(content, properties.getAuthTokenSecret());
+    }
+
+    private byte[] sign(String content, String secret) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(properties.getAuthTokenSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return mac.doFinal(content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private boolean isSignatureValid(String signingInput, String incomingSignature) throws Exception {
+        for (String secret : allValidSecrets()) {
+            String expectedSignature = b64Url(sign(signingInput, secret));
+            if (expectedSignature.equals(incomingSignature)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Iterable<String> allValidSecrets() {
+        ArrayList<String> secrets = new ArrayList<>();
+        secrets.add(properties.getAuthTokenSecret());
+
+        String previous = properties.getAuthTokenPreviousSecrets();
+        if (previous != null && !previous.isBlank()) {
+            for (String candidate : previous.split(",")) {
+                String value = candidate.trim();
+                if (!value.isBlank()) {
+                    secrets.add(value);
+                }
+            }
+        }
+        return secrets;
     }
 
     private String b64Url(byte[] bytes) {

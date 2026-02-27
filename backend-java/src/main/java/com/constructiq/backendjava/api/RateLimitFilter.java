@@ -1,6 +1,7 @@
 package com.constructiq.backendjava.api;
 
 import com.constructiq.backendjava.config.ConstructIQProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,10 +21,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private record Bucket(long minuteEpoch, int count) {}
 
     private final ConstructIQProperties properties;
+    private final MeterRegistry meterRegistry;
     private final Map<String, Bucket> counters = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(ConstructIQProperties properties) {
+    public RateLimitFilter(ConstructIQProperties properties, MeterRegistry meterRegistry) {
         this.properties = properties;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -49,6 +52,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         if (current.count >= threshold) {
+            meterRegistry.counter("constructiq_rate_limit_blocked_total", "path", path).increment();
             response.setStatus(429);
             response.setContentType("application/json");
             response.getWriter().write("{\"detail\":\"Too many requests\",\"status\":429}");
@@ -56,6 +60,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         counters.put(key, new Bucket(minute, current.count + 1));
+        meterRegistry.counter("constructiq_rate_limit_allowed_total", "path", path).increment();
         filterChain.doFilter(request, response);
     }
 }

@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: constructiq-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-procurement_db}
+      MYSQL_USER: ${MYSQL_USER:-constructiq}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-constructiq}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: constructiq-backend-java
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8000}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-procurement_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: ${MYSQL_USER:-constructiq}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-constructiq}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      DEMO_ORG_ID: ${DEMO_ORG_ID:-demo-org-001}
+      DEMO_USER_ID: ${DEMO_USER_ID:-demo-user-001}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-change-this-secret}
+      AUTH_TOKEN_TTL_MINUTES: ${AUTH_TOKEN_TTL_MINUTES:-480}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@constructiq.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+      AUTH_LOGIN_RATE_LIMIT_PER_MINUTE: ${AUTH_LOGIN_RATE_LIMIT_PER_MINUTE:-20}
+      SENDER_EMAIL: ${SENDER_EMAIL:-onboarding@resend.dev}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+    ports:
+      - "8010:8000"
+
+volumes:
+  mysql_data:
