@@ -2,6 +2,9 @@ package com.constructiq.backendjava.controller;
 
 import com.constructiq.backendjava.config.ConstructIQProperties;
 import com.constructiq.backendjava.model.DemoContext;
+import com.constructiq.backendjava.security.AuthContext;
+import com.constructiq.backendjava.security.AuthContextHolder;
+import com.constructiq.backendjava.security.AuthTokenService;
 import com.constructiq.backendjava.store.SqlDocumentStore;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -24,10 +27,12 @@ public class ApiController {
 
     private final SqlDocumentStore store;
     private final ConstructIQProperties properties;
+    private final AuthTokenService tokenService;
 
-    public ApiController(SqlDocumentStore store, ConstructIQProperties properties) {
+    public ApiController(SqlDocumentStore store, ConstructIQProperties properties, AuthTokenService tokenService) {
         this.store = store;
         this.properties = properties;
+        this.tokenService = tokenService;
     }
 
     @PostConstruct
@@ -49,9 +54,19 @@ public class ApiController {
 
     private DemoContext requireContext() {
         if (!properties.isDemoMode()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+            AuthContext auth = AuthContextHolder.get();
+            if (auth == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+            }
+            return new DemoContext(auth.orgId(), auth.userId(), auth.role(), false);
         }
         return new DemoContext(properties.getDemoOrgId(), properties.getDemoUserId(), "admin", true);
+    }
+
+    private void requireAdmin(DemoContext ctx) {
+        if (!"admin".equalsIgnoreCase(ctx.userRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role required");
+        }
     }
 
     private Map<String, Object> sanitize(Map<String, Object> doc) {
@@ -136,6 +151,63 @@ public class ApiController {
     }
 
     // ==================== DEMO ====================
+    @PostMapping("/auth/login")
+    public Map<String, Object> login(@RequestBody Map<String, Object> data) {
+        String email = asString(data.get("email"), "").trim().toLowerCase(Locale.ROOT);
+        String password = asString(data.get("password"), "");
+        if (email.isBlank() || password.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email and password are required");
+        }
+
+        boolean defaultAdmin = email.equalsIgnoreCase(properties.getAdminEmail())
+                && password.equals(properties.getAdminPassword());
+
+        String orgId = properties.getDemoOrgId();
+        String userId = properties.getDemoUserId();
+        String role = "admin";
+
+        if (!defaultAdmin) {
+            List<Map<String, Object>> users = store.find(
+                    "users",
+                    Map.of("email", email, "status", "active"),
+                    null,
+                    false,
+                    0,
+                    1
+            );
+            if (users.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            }
+            Map<String, Object> user = users.get(0);
+            String storedPassword = asString(user.get("password"), "");
+            if (!storedPassword.isBlank() && !storedPassword.equals(password)) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            }
+            orgId = asString(user.get("org_id"), orgId);
+            userId = asString(user.get("id"), userId);
+            role = asString(user.get("role"), "buyer");
+        }
+
+        String token = tokenService.createToken(userId, orgId, role, email);
+        return Map.of(
+                "access_token", token,
+                "token_type", "bearer",
+                "user", Map.of("id", userId, "org_id", orgId, "role", role, "email", email),
+                "demo_mode", properties.isDemoMode()
+        );
+    }
+
+    @GetMapping("/auth/me")
+    public Map<String, Object> me() {
+        DemoContext ctx = requireContext();
+        return Map.of(
+                "id", ctx.userId(),
+                "org_id", ctx.orgId(),
+                "role", ctx.userRole(),
+                "demo_mode", ctx.demo()
+        );
+    }
+
     @GetMapping("/demo/status")
     public Map<String, Object> demoStatus() {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -148,6 +220,7 @@ public class ApiController {
     @PostMapping("/demo/reset")
     public Map<String, Object> resetDemo() {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         List<String> collections = List.of("projects", "suppliers", "normalized_products", "rfqs", "quotes", "price_points", "alert_rules", "alert_events");
         for (String coll : collections) {
             store.deleteByQuery(coll, Map.of("org_id", ctx.orgId()), false);
@@ -208,6 +281,7 @@ public class ApiController {
     @PostMapping("/projects")
     public Map<String, Object> createProject(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -221,6 +295,7 @@ public class ApiController {
     @PutMapping("/projects/{projectId}")
     public Map<String, Object> updateProject(@PathVariable String projectId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         getOr404("projects", projectId, ctx.orgId(), "Project not found");
         Map<String, Object> updates = new LinkedHashMap<>(data);
         updates.remove("id");
@@ -233,6 +308,7 @@ public class ApiController {
     @DeleteMapping("/projects/{projectId}")
     public Map<String, Object> deleteProject(@PathVariable String projectId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         long deleted = store.deleteOne("projects", projectId, ctx.orgId());
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
@@ -264,6 +340,7 @@ public class ApiController {
     @PostMapping("/suppliers")
     public Map<String, Object> createSupplier(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -277,6 +354,7 @@ public class ApiController {
     @PutMapping("/suppliers/{supplierId}")
     public Map<String, Object> updateSupplier(@PathVariable String supplierId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         getOr404("suppliers", supplierId, ctx.orgId(), "Supplier not found");
         Map<String, Object> updates = new LinkedHashMap<>(data);
         updates.remove("id");
@@ -289,6 +367,7 @@ public class ApiController {
     @DeleteMapping("/suppliers/{supplierId}")
     public Map<String, Object> deleteSupplier(@PathVariable String supplierId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         long deleted = store.deleteOne("suppliers", supplierId, ctx.orgId());
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Supplier not found");
@@ -324,6 +403,7 @@ public class ApiController {
     @PostMapping("/catalog/products")
     public Map<String, Object> createProduct(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -336,6 +416,7 @@ public class ApiController {
     @PutMapping("/catalog/products/{productId}")
     public Map<String, Object> updateProduct(@PathVariable String productId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         getOr404("normalized_products", productId, ctx.orgId(), "Product not found");
         Map<String, Object> updates = new LinkedHashMap<>(data);
         updates.remove("id");
@@ -347,6 +428,7 @@ public class ApiController {
     @DeleteMapping("/catalog/products/{productId}")
     public Map<String, Object> deleteProduct(@PathVariable String productId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         long deleted = store.deleteOne("normalized_products", productId, ctx.orgId());
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
@@ -389,6 +471,7 @@ public class ApiController {
     @PostMapping("/rfqs")
     public Map<String, Object> createRfq(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -414,6 +497,7 @@ public class ApiController {
     @PutMapping("/rfqs/{rfqId}")
     public Map<String, Object> updateRfq(@PathVariable String rfqId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         getOr404("rfqs", rfqId, ctx.orgId(), "RFQ not found");
 
         Map<String, Object> updates = new LinkedHashMap<>();
@@ -441,6 +525,7 @@ public class ApiController {
     @PostMapping("/rfqs/{rfqId}/send")
     public Map<String, Object> sendRfq(@PathVariable String rfqId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> rfq = getOr404("rfqs", rfqId, ctx.orgId(), "RFQ not found");
         if ("sent".equals(asString(rfq.get("status"), ""))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "RFQ already sent");
@@ -469,6 +554,7 @@ public class ApiController {
     @DeleteMapping("/rfqs/{rfqId}")
     public Map<String, Object> deleteRfq(@PathVariable String rfqId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         long deleted = store.deleteOne("rfqs", rfqId, ctx.orgId());
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "RFQ not found");
@@ -508,6 +594,7 @@ public class ApiController {
     @PostMapping("/quotes")
     public Map<String, Object> createQuote(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> quote = new LinkedHashMap<>(data);
 
         List<Map<String, Object>> items = new ArrayList<>();
@@ -550,6 +637,7 @@ public class ApiController {
     @PutMapping("/quotes/{quoteId}")
     public Map<String, Object> updateQuote(@PathVariable String quoteId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         getOr404("quotes", quoteId, ctx.orgId(), "Quote not found");
 
         Map<String, Object> updates = new LinkedHashMap<>();
@@ -585,6 +673,7 @@ public class ApiController {
                                             @PathVariable String itemId,
                                             @RequestParam("product_id") String productId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> quote = getOr404("quotes", quoteId, ctx.orgId(), "Quote not found");
         getOr404("normalized_products", productId, ctx.orgId(), "Product not found");
 
@@ -612,6 +701,7 @@ public class ApiController {
     @DeleteMapping("/quotes/{quoteId}")
     public Map<String, Object> deleteQuote(@PathVariable String quoteId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         long deleted = store.deleteOne("quotes", quoteId, ctx.orgId());
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Quote not found");
@@ -712,6 +802,7 @@ public class ApiController {
     @PostMapping("/alerts/rules")
     public Map<String, Object> createAlertRule(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -725,6 +816,7 @@ public class ApiController {
     @PutMapping("/alerts/rules/{ruleId}")
     public Map<String, Object> updateAlertRule(@PathVariable String ruleId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         getOr404("alert_rules", ruleId, ctx.orgId(), "Rule not found");
 
         Map<String, Object> updates = new LinkedHashMap<>(data);
@@ -737,6 +829,7 @@ public class ApiController {
     @DeleteMapping("/alerts/rules/{ruleId}")
     public Map<String, Object> deleteAlertRule(@PathVariable String ruleId) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         long deleted = store.deleteOne("alert_rules", ruleId, ctx.orgId());
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Rule not found");
@@ -789,6 +882,7 @@ public class ApiController {
     @PutMapping("/alerts/events/{eventId}")
     public Map<String, Object> updateAlertEvent(@PathVariable String eventId, @RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         Map<String, Object> event = getOr404("alert_events", eventId, ctx.orgId(), "Event not found");
         event.put("status", data.get("status"));
         store.upsert("alert_events", event);
@@ -897,6 +991,8 @@ public class ApiController {
     // ==================== DEMO SEED ====================
     @PostMapping("/__seed")
     public Map<String, Object> seedEndpoint() {
+        DemoContext ctx = requireContext();
+        requireAdmin(ctx);
         seedDemoData();
         return Map.of("message", "seeded");
     }

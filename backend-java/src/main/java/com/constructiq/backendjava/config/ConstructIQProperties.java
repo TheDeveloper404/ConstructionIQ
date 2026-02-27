@@ -10,6 +10,10 @@ public class ConstructIQProperties {
     private String corsOrigins = "*";
     private String senderEmail = "onboarding@resend.dev";
     private String resendApiKey = "";
+    private String authTokenSecret = "change-this-secret";
+    private long authTokenTtlMinutes = 480;
+    private String adminEmail = "admin@constructiq.local";
+    private String adminPassword = "admin123";
 
     public boolean isDemoMode() {
         return demoMode;
@@ -57,5 +61,37 @@ public class ConstructIQProperties {
 
     public void setResendApiKey(String resendApiKey) {
         this.resendApiKey = resendApiKey;
+    }
+
+    public String getAuthTokenSecret() {
+        return authTokenSecret;
+    }
+
+    public void setAuthTokenSecret(String authTokenSecret) {
+        this.authTokenSecret = authTokenSecret;
+    }
+
+    public long getAuthTokenTtlMinutes() {
+        return authTokenTtlMinutes;
+    }
+
+    public void setAuthTokenTtlMinutes(long authTokenTtlMinutes) {
+        this.authTokenTtlMinutes = authTokenTtlMinutes;
+    }
+
+    public String getAdminEmail() {
+        return adminEmail;
+    }
+
+    public void setAdminEmail(String adminEmail) {
+        this.adminEmail = adminEmail;
+    }
+
+    public String getAdminPassword() {
+        return adminPassword;
+    }
+
+    public void setAdminPassword(String adminPassword) {
+        this.adminPassword = adminPassword;
     }
 }

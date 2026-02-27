@@ -26,3 +26,7 @@ constructiq:
   cors-origins: ${CORS_ORIGINS:*}
   sender-email: ${SENDER_EMAIL:onboarding@resend.dev}
   resend-api-key: ${RESEND_API_KEY:}
+  auth-token-secret: ${AUTH_TOKEN_SECRET:change-this-secret}
+  auth-token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:480}
+  admin-email: ${ADMIN_EMAIL:admin@constructiq.local}
+  admin-password: ${ADMIN_PASSWORD:admin123}

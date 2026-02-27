@@ -1,7 +1,9 @@
 package com.constructiq.backendjava.controller;
 
 import com.constructiq.backendjava.config.ConstructIQProperties;
+import com.constructiq.backendjava.security.AuthTokenService;
 import com.constructiq.backendjava.store.SqlDocumentStore;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,7 +33,7 @@ class ApiControllerContractTest {
         props.setDemoMode(true);
         props.setDemoOrgId("demo-org-001");
         props.setDemoUserId("demo-user-001");
-        controller = new ApiController(store, props);
+        controller = new ApiController(store, props, new AuthTokenService(props, new ObjectMapper()));
     }
 
     @Test
