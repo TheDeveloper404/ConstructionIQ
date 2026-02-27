@@ -44,6 +44,22 @@ public class ApiController {
         }
     }
 
+    private String requireNonBlank(Map<String, Object> data, String key, String message) {
+        String value = asString(data.get(key), "").trim();
+        if (value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+        return value;
+    }
+
+    private List<Object> requireNonEmptyList(Map<String, Object> data, String key, String message) {
+        List<Object> values = asList(data.get(key));
+        if (values.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+        return values;
+    }
+
     private String nowIso() {
         return OffsetDateTime.now(ZoneOffset.UTC).toString();
     }
@@ -282,6 +298,7 @@ public class ApiController {
     public Map<String, Object> createProject(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        requireNonBlank(data, "name", "Project name is required");
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -297,6 +314,9 @@ public class ApiController {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
         getOr404("projects", projectId, ctx.orgId(), "Project not found");
+        if (data.containsKey("name")) {
+            requireNonBlank(data, "name", "Project name is required");
+        }
         Map<String, Object> updates = new LinkedHashMap<>(data);
         updates.remove("id");
         updates.remove("org_id");
@@ -341,6 +361,7 @@ public class ApiController {
     public Map<String, Object> createSupplier(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        requireNonBlank(data, "name", "Supplier name is required");
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -356,6 +377,9 @@ public class ApiController {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
         getOr404("suppliers", supplierId, ctx.orgId(), "Supplier not found");
+        if (data.containsKey("name")) {
+            requireNonBlank(data, "name", "Supplier name is required");
+        }
         Map<String, Object> updates = new LinkedHashMap<>(data);
         updates.remove("id");
         updates.remove("org_id");
@@ -404,6 +428,9 @@ public class ApiController {
     public Map<String, Object> createProduct(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        requireNonBlank(data, "canonical_name", "Product canonical_name is required");
+        requireNonBlank(data, "category", "Product category is required");
+        requireNonBlank(data, "base_uom", "Product base_uom is required");
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -418,6 +445,15 @@ public class ApiController {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
         getOr404("normalized_products", productId, ctx.orgId(), "Product not found");
+        if (data.containsKey("canonical_name")) {
+            requireNonBlank(data, "canonical_name", "Product canonical_name is required");
+        }
+        if (data.containsKey("category")) {
+            requireNonBlank(data, "category", "Product category is required");
+        }
+        if (data.containsKey("base_uom")) {
+            requireNonBlank(data, "base_uom", "Product base_uom is required");
+        }
         Map<String, Object> updates = new LinkedHashMap<>(data);
         updates.remove("id");
         updates.remove("org_id");
@@ -472,6 +508,8 @@ public class ApiController {
     public Map<String, Object> createRfq(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        requireNonBlank(data, "title", "RFQ title is required");
+        requireNonBlank(data, "project_id", "RFQ project_id is required");
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());
@@ -482,8 +520,9 @@ public class ApiController {
         doc.putIfAbsent("supplier_ids", new ArrayList<>());
 
         List<Map<String, Object>> normalizedItems = new ArrayList<>();
-        for (Object item : asList(doc.get("items"))) {
+        for (Object item : requireNonEmptyList(doc, "items", "RFQ must contain at least one item")) {
             Map<String, Object> itemDoc = asMap(item);
+            requireNonBlank(itemDoc, "raw_text", "RFQ item raw_text is required");
             itemDoc.putIfAbsent("id", uuid());
             itemDoc.putIfAbsent("specs", new LinkedHashMap<>());
             normalizedItems.add(itemDoc);
@@ -508,8 +547,9 @@ public class ApiController {
         }
         if (data.containsKey("items")) {
             List<Map<String, Object>> normalized = new ArrayList<>();
-            for (Object item : asList(data.get("items"))) {
+            for (Object item : requireNonEmptyList(data, "items", "RFQ must contain at least one item")) {
                 Map<String, Object> itemDoc = asMap(item);
+                requireNonBlank(itemDoc, "raw_text", "RFQ item raw_text is required");
                 itemDoc.putIfAbsent("id", uuid());
                 itemDoc.putIfAbsent("specs", new LinkedHashMap<>());
                 normalized.add(itemDoc);
@@ -595,15 +635,23 @@ public class ApiController {
     public Map<String, Object> createQuote(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        requireNonBlank(data, "supplier_id", "Quote supplier_id is required");
         Map<String, Object> quote = new LinkedHashMap<>(data);
 
         List<Map<String, Object>> items = new ArrayList<>();
         double totalAmount = 0.0;
-        for (Object raw : asList(quote.get("items"))) {
+        for (Object raw : requireNonEmptyList(quote, "items", "Quote must contain at least one item")) {
             Map<String, Object> item = asMap(raw);
+            requireNonBlank(item, "raw_line_text", "Quote item raw_line_text is required");
             item.putIfAbsent("id", uuid());
             double qty = asDouble(item.get("qty"), 0.0);
             double unitPrice = asDouble(item.get("unit_price"), 0.0);
+            if (qty <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote item qty must be greater than 0");
+            }
+            if (unitPrice < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote item unit_price must be >= 0");
+            }
             double totalPrice = qty * unitPrice;
             item.put("total_price", totalPrice);
             items.add(item);
@@ -650,11 +698,18 @@ public class ApiController {
         if (data.containsKey("items")) {
             List<Map<String, Object>> items = new ArrayList<>();
             double totalAmount = 0.0;
-            for (Object raw : asList(data.get("items"))) {
+            for (Object raw : requireNonEmptyList(data, "items", "Quote must contain at least one item")) {
                 Map<String, Object> item = asMap(raw);
+                requireNonBlank(item, "raw_line_text", "Quote item raw_line_text is required");
                 item.putIfAbsent("id", uuid());
                 double qty = asDouble(item.get("qty"), 0.0);
                 double unitPrice = asDouble(item.get("unit_price"), 0.0);
+                if (qty <= 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote item qty must be greater than 0");
+                }
+                if (unitPrice < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote item unit_price must be >= 0");
+                }
                 item.put("total_price", qty * unitPrice);
                 totalAmount += qty * unitPrice;
                 items.add(item);
@@ -674,6 +729,9 @@ public class ApiController {
                                             @RequestParam("product_id") String productId) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        if (productId == null || productId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product_id is required");
+        }
         Map<String, Object> quote = getOr404("quotes", quoteId, ctx.orgId(), "Quote not found");
         getOr404("normalized_products", productId, ctx.orgId(), "Product not found");
 
@@ -803,6 +861,8 @@ public class ApiController {
     public Map<String, Object> createAlertRule(@RequestBody Map<String, Object> data) {
         DemoContext ctx = requireContext();
         requireAdmin(ctx);
+        requireNonBlank(data, "name", "Alert rule name is required");
+        requireNonBlank(data, "type", "Alert rule type is required");
         Map<String, Object> doc = new LinkedHashMap<>(data);
         doc.put("id", uuid());
         doc.put("org_id", ctx.orgId());

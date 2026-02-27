@@ -34,3 +34,6 @@ constructiq:
   auth-token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:480}
   admin-email: ${ADMIN_EMAIL:admin@constructiq.local}
   admin-password: ${ADMIN_PASSWORD:admin123}
+  rate-limit-enabled: ${RATE_LIMIT_ENABLED:true}
+  rate-limit-per-minute: ${RATE_LIMIT_PER_MINUTE:120}
+  auth-login-rate-limit-per-minute: ${AUTH_LOGIN_RATE_LIMIT_PER_MINUTE:20}

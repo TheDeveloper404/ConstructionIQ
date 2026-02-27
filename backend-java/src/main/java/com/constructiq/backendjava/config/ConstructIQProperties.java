@@ -14,6 +14,9 @@ public class ConstructIQProperties {
     private long authTokenTtlMinutes = 480;
     private String adminEmail = "admin@constructiq.local";
     private String adminPassword = "admin123";
+    private boolean rateLimitEnabled = true;
+    private int rateLimitPerMinute = 120;
+    private int authLoginRateLimitPerMinute = 20;
 
     public boolean isDemoMode() {
         return demoMode;
@@ -93,5 +96,29 @@ public class ConstructIQProperties {
 
     public void setAdminPassword(String adminPassword) {
         this.adminPassword = adminPassword;
+    }
+
+    public boolean isRateLimitEnabled() {
+        return rateLimitEnabled;
+    }
+
+    public void setRateLimitEnabled(boolean rateLimitEnabled) {
+        this.rateLimitEnabled = rateLimitEnabled;
+    }
+
+    public int getRateLimitPerMinute() {
+        return rateLimitPerMinute;
+    }
+
+    public void setRateLimitPerMinute(int rateLimitPerMinute) {
+        this.rateLimitPerMinute = rateLimitPerMinute;
+    }
+
+    public int getAuthLoginRateLimitPerMinute() {
+        return authLoginRateLimitPerMinute;
+    }
+
+    public void setAuthLoginRateLimitPerMinute(int authLoginRateLimitPerMinute) {
+        this.authLoginRateLimitPerMinute = authLoginRateLimitPerMinute;
     }
 }
