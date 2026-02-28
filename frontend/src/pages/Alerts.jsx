@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { API } from '../App';
+import React, { useState, useEffect, useCallback } from 'react';
+import { API } from '../lib/api';
+import SeverityBadge from '../components/SeverityBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -29,7 +30,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Plus, Bell, AlertTriangle, Check, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Plus, Bell, Check, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Alerts() {
@@ -47,7 +48,7 @@ export default function Alerts() {
     is_active: true,
   });
 
-  const fetchRules = async () => {
+  const fetchRules = useCallback(async () => {
     setLoadingRules(true);
     try {
       const response = await API.get('/alerts/rules');
@@ -57,9 +58,9 @@ export default function Alerts() {
     } finally {
       setLoadingRules(false);
     }
-  };
+  }, []);
 
-  const fetchEvents = async (page = 1, status = '') => {
+  const fetchEvents = useCallback(async (page = 1, status = '') => {
     setLoadingEvents(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
@@ -77,16 +78,16 @@ export default function Alerts() {
     } finally {
       setLoadingEvents(false);
     }
-  };
-
-  useEffect(() => {
-    fetchRules();
-    fetchEvents(1, eventFilter);
   }, []);
 
   useEffect(() => {
+    fetchRules();
+    fetchEvents(1, '');
+  }, [fetchRules, fetchEvents]);
+
+  useEffect(() => {
     fetchEvents(1, eventFilter);
-  }, [eventFilter]);
+  }, [fetchEvents, eventFilter]);
 
   const handleSubmitRule = async (e) => {
     e.preventDefault();
@@ -135,24 +136,6 @@ export default function Alerts() {
     } catch (error) {
       toast.error('Eroare la confirmarea alertei');
     }
-  };
-
-  const getSeverityBadge = (severity) => {
-    const labels = {
-      high: 'Ridicată',
-      medium: 'Medie',
-      low: 'Scăzută',
-    };
-    const styles = {
-      high: 'bg-red-100 text-red-700',
-      medium: 'bg-amber-100 text-amber-700',
-      low: 'bg-slate-100 text-slate-600',
-    };
-    return (
-      <Badge variant="secondary" className={styles[severity] || styles.low}>
-        {labels[severity] || severity}
-      </Badge>
-    );
   };
 
   return (
@@ -221,13 +204,7 @@ export default function Alerts() {
                     events.map((event) => (
                       <TableRow key={event.id} data-testid={`event-row-${event.id}`}>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className={`h-4 w-4 ${
-                              event.severity === 'high' ? 'text-red-500' :
-                              event.severity === 'medium' ? 'text-amber-500' : 'text-slate-400'
-                            }`} />
-                            {getSeverityBadge(event.severity)}
-                          </div>
+                          <SeverityBadge severity={event.severity} showIcon={true} />
                         </TableCell>
                         <TableCell>
                           <span className="font-medium">{event.product_name || 'Necunoscut'}</span>

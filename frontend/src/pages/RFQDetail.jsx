@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { API } from '../App';
+import { API, fetchAllPages } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -25,31 +25,38 @@ export default function RFQDetail() {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchData = async () => {
       try {
-        const rfqRes = await API.get(`/rfqs/${id}`);
+        const rfqRes = await API.get(`/rfqs/${id}`, { signal: controller.signal });
         setRfq(rfqRes.data);
-        
+
+        const fetches = [];
         if (rfqRes.data.project_id) {
-          const projectRes = await API.get(`/projects/${rfqRes.data.project_id}`);
-          setProject(projectRes.data);
-        }
-        
-        if (rfqRes.data.supplier_ids?.length > 0) {
-          const suppliersRes = await API.get('/suppliers?page_size=100');
-          const selectedSuppliers = suppliersRes.data.items.filter(
-            (s) => rfqRes.data.supplier_ids.includes(s.id)
+          fetches.push(
+            API.get(`/projects/${rfqRes.data.project_id}`, { signal: controller.signal })
+              .then((r) => setProject(r.data))
           );
-          setSuppliers(selectedSuppliers);
         }
+        if (rfqRes.data.supplier_ids?.length > 0) {
+          fetches.push(
+            fetchAllPages('/suppliers').then((list) =>
+              setSuppliers(list.filter((s) => rfqRes.data.supplier_ids.includes(s.id)))
+            )
+          );
+        }
+        await Promise.all(fetches);
       } catch (error) {
-        toast.error('Eroare la încărcarea cererii de ofertă');
-        navigate('/rfqs');
+        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+          toast.error('Eroare la încărcarea cererii de ofertă');
+          navigate('/rfqs');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
+    return () => controller.abort();
   }, [id, navigate]);
 
   const handleSend = async () => {

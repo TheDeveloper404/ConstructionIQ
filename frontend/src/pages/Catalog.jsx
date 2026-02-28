@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { API } from '../App';
+import React, { useState, useEffect, useCallback } from 'react';
+import { API } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -44,7 +44,7 @@ export default function Catalog() {
     base_uom: 'unit',
   });
 
-  const fetchProducts = async (page = 1, searchQuery = '', category = '') => {
+  const fetchProducts = useCallback(async (page = 1, searchQuery = '', category = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
@@ -63,25 +63,25 @@ export default function Catalog() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await API.get('/catalog/categories');
       setCategories(response.data.categories || []);
     } catch (error) {
       console.error('Failed to load categories');
     }
-  };
-
-  useEffect(() => {
-    fetchProducts(1, search, categoryFilter);
-    fetchCategories();
   }, []);
 
   useEffect(() => {
+    fetchProducts(1, '', '');
+    fetchCategories();
+  }, [fetchProducts, fetchCategories]);
+
+  useEffect(() => {
     fetchProducts(1, search, categoryFilter);
-  }, [categoryFilter]);
+  }, [fetchProducts, search, categoryFilter]);
 
   const handleSearch = (e) => {
     e.preventDefault();

@@ -49,6 +49,26 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
     ports:
       - "8010:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: /api-proxy
+    container_name: constructiq-frontend
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "3000:80"
 
 volumes:
   mysql_data:

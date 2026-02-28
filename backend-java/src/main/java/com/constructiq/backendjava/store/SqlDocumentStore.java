@@ -2,8 +2,11 @@ package com.constructiq.backendjava.store;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
@@ -13,6 +16,7 @@ import java.util.stream.Collectors;
 
 @Component
 public class SqlDocumentStore {
+    private static final Logger log = LoggerFactory.getLogger(SqlDocumentStore.class);
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final JdbcTemplate jdbc;
@@ -54,11 +58,12 @@ public class SqlDocumentStore {
     }
 
     public List<Map<String, Object>> findAll(String collection) {
-        return jdbc.query(
+        List<Map<String, Object>> rows = jdbc.query(
                 "SELECT json_data FROM documents WHERE collection_name=?",
                 (rs, rowNum) -> toMap(rs.getString("json_data")),
                 collection
         );
+        return rows.stream().filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     public long deleteByQuery(String collection, Map<String, Object> query, boolean single) {
@@ -77,6 +82,7 @@ public class SqlDocumentStore {
         return deleted;
     }
 
+    @Transactional
     public long updateByQuery(String collection, Map<String, Object> query, Map<String, Object> updates, boolean single) {
         List<Map<String, Object>> matched = filter(collection, query);
         long updated = 0;
@@ -85,8 +91,9 @@ public class SqlDocumentStore {
             if (idObj == null) {
                 continue;
             }
-            doc.putAll(updates);
-            upsert(collection, doc);
+            Map<String, Object> merged = new LinkedHashMap<>(doc);
+            merged.putAll(updates);
+            upsert(collection, merged);
             updated++;
             if (single) {
                 break;
@@ -96,28 +103,58 @@ public class SqlDocumentStore {
     }
 
     public long count(String collection, Map<String, Object> query) {
-        return filter(collection, query).size();
+        SqlQuery built = buildSqlQuery(collection, query);
+        if (built.hasComplexFilters()) {
+            return filter(collection, query).size();
+        }
+        String sql = "SELECT COUNT(*) FROM documents WHERE collection_name=?" + built.whereClause();
+        List<Object> params = new ArrayList<>();
+        params.add(collection);
+        params.addAll(built.params());
+        Long result = jdbc.queryForObject(sql, Long.class, params.toArray());
+        return result == null ? 0 : result;
     }
 
     public List<Map<String, Object>> find(String collection, Map<String, Object> query, String sortField, boolean desc, int skip, int limit) {
-        List<Map<String, Object>> docs = filter(collection, query);
+        SqlQuery built = buildSqlQuery(collection, query);
+        if (built.hasComplexFilters()) {
+            List<Map<String, Object>> docs = filter(collection, query);
+            return sortAndPage(docs, sortField, desc, skip, limit);
+        }
+
+        StringBuilder sql = new StringBuilder("SELECT json_data FROM documents WHERE collection_name=?");
+        sql.append(built.whereClause());
+
+        if (sortField != null && !sortField.isBlank()) {
+            String direction = desc ? "DESC" : "ASC";
+            sql.append(" ORDER BY JSON_UNQUOTE(JSON_EXTRACT(json_data, '$.").append(sortField).append("')) ").append(direction);
+        }
+        if (limit > 0) {
+            sql.append(" LIMIT ").append(limit).append(" OFFSET ").append(Math.max(0, skip));
+        }
+
+        List<Object> params = new ArrayList<>();
+        params.add(collection);
+        params.addAll(built.params());
+
+        List<Map<String, Object>> rows = jdbc.query(sql.toString(),
+                (rs, rowNum) -> toMap(rs.getString("json_data")),
+                params.toArray());
+        return rows.stream().filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
+    private List<Map<String, Object>> sortAndPage(List<Map<String, Object>> docs, String sortField, boolean desc, int skip, int limit) {
         if (sortField != null && !sortField.isBlank()) {
             Comparator<Map<String, Object>> comparator = (left, right) -> {
                 Comparable<Object> a = comparableValue(left.get(sortField));
                 Comparable<Object> b = comparableValue(right.get(sortField));
                 return a.compareTo(b);
             };
-            if (desc) {
-                comparator = comparator.reversed();
-            }
+            if (desc) comparator = comparator.reversed();
             docs.sort(comparator);
         }
-
         int from = Math.max(0, skip);
-        if (from >= docs.size()) {
-            return new ArrayList<>();
-        }
-
+        if (from >= docs.size()) return new ArrayList<>();
         int to = limit <= 0 ? docs.size() : Math.min(docs.size(), from + limit);
         return new ArrayList<>(docs.subList(from, to));
     }
@@ -143,9 +180,50 @@ public class SqlDocumentStore {
         upsert(collection, existing);
     }
 
+    private static final Set<String> SIMPLE_FIELDS = Set.of("org_id", "id", "status", "is_active",
+            "collection_name", "source_type", "rule_id", "supplier_id", "rfq_id",
+            "normalized_product_id", "project_id", "email", "role");
+
+    private record SqlQuery(String whereClause, List<Object> params, boolean hasComplexFilters) {}
+
+    private SqlQuery buildSqlQuery(String collection, Map<String, Object> query) {
+        StringBuilder where = new StringBuilder();
+        List<Object> params = new ArrayList<>();
+        boolean hasComplex = false;
+
+        for (Map.Entry<String, Object> e : query.entrySet()) {
+            String field = e.getKey();
+            Object value = e.getValue();
+            if (value instanceof Map<?, ?>) {
+                hasComplex = true;
+                continue;
+            }
+            if (SIMPLE_FIELDS.contains(field)) {
+                where.append(" AND JSON_UNQUOTE(JSON_EXTRACT(json_data, '$.").append(field).append("'))=?");
+                params.add(String.valueOf(value));
+            } else {
+                hasComplex = true;
+            }
+        }
+        return new SqlQuery(where.toString(), params, hasComplex);
+    }
+
     private List<Map<String, Object>> filter(String collection, Map<String, Object> query) {
-        List<Map<String, Object>> rows = findAll(collection);
-        return rows.stream().filter(doc -> matches(doc, query)).collect(Collectors.toList());
+        SqlQuery built = buildSqlQuery(collection, query);
+        String sql = "SELECT json_data FROM documents WHERE collection_name=?" + built.whereClause();
+        List<Object> params = new ArrayList<>();
+        params.add(collection);
+        params.addAll(built.params());
+
+        List<Map<String, Object>> rows = jdbc.query(sql,
+                (rs, rowNum) -> toMap(rs.getString("json_data")),
+                params.toArray());
+        List<Map<String, Object>> clean = rows.stream().filter(Objects::nonNull).collect(Collectors.toList());
+
+        if (!built.hasComplexFilters()) {
+            return clean;
+        }
+        return clean.stream().filter(doc -> matches(doc, query)).collect(Collectors.toList());
     }
 
     private boolean matches(Map<String, Object> doc, Map<String, Object> query) {
@@ -208,7 +286,8 @@ public class SqlDocumentStore {
         try {
             return mapper.readValue(json, MAP_TYPE);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse JSON", e);
+            log.error("Skipping corrupt document — failed to parse JSON: {}", e.getMessage());
+            return null;
         }
     }
 

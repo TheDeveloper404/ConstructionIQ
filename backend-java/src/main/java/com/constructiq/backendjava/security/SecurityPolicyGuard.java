@@ -21,12 +21,27 @@ public class SecurityPolicyGuard {
     @PostConstruct
     public void checkPolicy() {
         String secret = properties.getAuthTokenSecret();
-        if (secret == null || secret.length() < 24 || "change-this-secret".equals(secret)) {
-            log.warn("Security policy: AUTH_TOKEN_SECRET is weak/default. Use >=24 chars and rotate regularly.");
-        }
+        boolean weakSecret = secret == null || secret.length() < 24 || "change-this-secret".equals(secret);
+        boolean plaintextPassword = !passwordService.isBcrypt(properties.getAdminPassword());
 
-        if (!passwordService.isBcrypt(properties.getAdminPassword())) {
-            log.warn("Security policy: ADMIN_PASSWORD is plaintext. Prefer bcrypt hash.");
+        if (properties.isDemoMode()) {
+            if (weakSecret) {
+                log.warn("Security policy [DEMO]: AUTH_TOKEN_SECRET is weak/default. Set a strong secret before going to production.");
+            }
+            if (plaintextPassword) {
+                log.warn("Security policy [DEMO]: ADMIN_PASSWORD is plaintext. Use a bcrypt hash before going to production.");
+            }
+        } else {
+            if (weakSecret) {
+                throw new IllegalStateException(
+                        "Security policy violation: AUTH_TOKEN_SECRET is weak or default. "
+                        + "Set AUTH_TOKEN_SECRET to a random string of at least 24 characters.");
+            }
+            if (plaintextPassword) {
+                throw new IllegalStateException(
+                        "Security policy violation: ADMIN_PASSWORD is stored as plaintext. "
+                        + "Set ADMIN_PASSWORD to a bcrypt hash (cost 12).");
+            }
         }
     }
 }

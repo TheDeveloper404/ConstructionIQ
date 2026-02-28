@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
+
+// API - imported here and re-exported for backward compatibility with pages that import from '../App'
+import { API } from './lib/api';
+export { API };
 
 // Layout
 import Layout from './components/Layout';
@@ -21,14 +24,6 @@ import QuoteCreate from './pages/QuoteCreate';
 import Catalog from './pages/Catalog';
 import PriceHistory from './pages/PriceHistory';
 import Alerts from './pages/Alerts';
-
-// API Setup
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-export const API = axios.create({
-  baseURL: `${BACKEND_URL}/api`,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
-});
 
 // Demo Context
 const DemoContext = createContext({

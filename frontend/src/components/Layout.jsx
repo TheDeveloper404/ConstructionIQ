@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useDemo, API } from '../App';
+import { useDemo } from '../App';
+import { API } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import {

@@ -14,6 +14,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @Order(2)
@@ -23,10 +26,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ConstructIQProperties properties;
     private final MeterRegistry meterRegistry;
     private final Map<String, Bucket> counters = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService cleaner = Executors.newSingleThreadScheduledExecutor(
+            r -> { Thread t = new Thread(r, "rate-limit-cleaner"); t.setDaemon(true); return t; });
 
     public RateLimitFilter(ConstructIQProperties properties, MeterRegistry meterRegistry) {
         this.properties = properties;
         this.meterRegistry = meterRegistry;
+        cleaner.scheduleAtFixedRate(this::evictExpiredBuckets, 1, 1, TimeUnit.MINUTES);
+    }
+
+    private void evictExpiredBuckets() {
+        long currentMinute = Instant.now().getEpochSecond() / 60;
+        counters.entrySet().removeIf(entry -> entry.getValue().minuteEpoch() < currentMinute);
     }
 
     @Override

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { API } from '../App';
+import { API, fetchAllPages } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
+import StatusBadge from '../components/StatusBadge';
 import {
   Table,
   TableBody,
@@ -29,57 +29,37 @@ export default function Quotes() {
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [statusFilter, setStatusFilter] = useState('');
 
-  const fetchQuotes = async (page = 1, status = '') => {
+  const fetchQuotes = useCallback(async (page = 1, status = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
       if (status) params.append('status', status);
       
-      const [quotesRes, suppliersRes] = await Promise.all([
+      const [quotesRes, suppliersList] = await Promise.all([
         API.get(`/quotes?${params}`),
-        API.get('/suppliers?page_size=100'),
+        fetchAllPages('/suppliers'),
       ]);
-      
+
       setQuotes(quotesRes.data.items);
       setPagination({
         page: quotesRes.data.page,
         total: quotesRes.data.total,
         totalPages: quotesRes.data.total_pages,
       });
-      
+
       const supplierMap = {};
-      suppliersRes.data.items.forEach((s) => {
-        supplierMap[s.id] = s.name;
-      });
+      suppliersList.forEach((s) => { supplierMap[s.id] = s.name; });
       setSuppliers(supplierMap);
     } catch (error) {
       toast.error('Eroare la încărcarea ofertelor');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchQuotes(1, statusFilter);
-  }, [statusFilter]);
-
-  const getStatusBadge = (status) => {
-    const labels = {
-      received: 'Primită',
-      validated: 'Validată',
-      archived: 'Arhivată',
-    };
-    const styles = {
-      received: 'bg-amber-100 text-amber-700',
-      validated: 'bg-emerald-100 text-emerald-700',
-      archived: 'bg-slate-100 text-slate-600',
-    };
-    return (
-      <Badge variant="secondary" className={styles[status] || styles.received}>
-        {labels[status] || status}
-      </Badge>
-    );
-  };
+  }, [fetchQuotes, statusFilter]);
 
   return (
     <div className="space-y-6" data-testid="quotes-page">
@@ -160,7 +140,7 @@ export default function Quotes() {
                         {quote.total_amount?.toLocaleString('ro-RO')} {quote.currency || 'RON'}
                       </span>
                     </TableCell>
-                    <TableCell>{getStatusBadge(quote.status)}</TableCell>
+                    <TableCell><StatusBadge status={quote.status} /></TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
                         {new Date(quote.received_at).toLocaleDateString('ro-RO')}

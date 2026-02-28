@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { API } from '../App';
+import { API } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
+import StatusBadge from '../components/StatusBadge';
 import {
   Table,
   TableBody,
@@ -28,7 +28,7 @@ export default function RFQs() {
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [statusFilter, setStatusFilter] = useState('');
 
-  const fetchRFQs = async (page = 1, status = '') => {
+  const fetchRFQs = useCallback(async (page = 1, status = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
@@ -46,29 +46,11 @@ export default function RFQs() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchRFQs(1, statusFilter);
-  }, [statusFilter]);
-
-  const getStatusBadge = (status) => {
-    const labels = {
-      draft: 'Ciornă',
-      sent: 'Trimisă',
-      closed: 'Închisă',
-    };
-    const styles = {
-      draft: 'bg-slate-100 text-slate-700',
-      sent: 'bg-blue-100 text-blue-700',
-      closed: 'bg-slate-100 text-slate-600',
-    };
-    return (
-      <Badge variant="secondary" className={styles[status] || styles.draft}>
-        {labels[status] || status}
-      </Badge>
-    );
-  };
+  }, [fetchRFQs, statusFilter]);
 
   return (
     <div className="space-y-6" data-testid="rfqs-page">
@@ -157,7 +139,7 @@ export default function RFQs() {
                         <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </TableCell>
-                    <TableCell>{getStatusBadge(rfq.status)}</TableCell>
+                    <TableCell><StatusBadge status={rfq.status} /></TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/rfqs/${rfq.id}`} data-testid={`view-rfq-${rfq.id}`}>

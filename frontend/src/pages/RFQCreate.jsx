@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { API } from '../App';
+import { API, fetchAllPages } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -43,23 +43,27 @@ export default function RFQCreate() {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchData = async () => {
       try {
-        const [projectsRes, suppliersRes, productsRes] = await Promise.all([
-          API.get('/projects?page_size=100'),
-          API.get('/suppliers?page_size=100'),
-          API.get('/catalog/products?page_size=100'),
+        const [projects, suppliers, products] = await Promise.all([
+          fetchAllPages('/projects'),
+          fetchAllPages('/suppliers'),
+          fetchAllPages('/catalog/products'),
         ]);
-        setProjects(projectsRes.data.items);
-        setSuppliers(suppliersRes.data.items);
-        setProducts(productsRes.data.items);
+        setProjects(projects);
+        setSuppliers(suppliers);
+        setProducts(products);
       } catch (error) {
-        toast.error('Eroare la încărcarea datelor');
+        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+          toast.error('Eroare la încărcarea datelor');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
+    return () => controller.abort();
   }, []);
 
   const addItem = () => {

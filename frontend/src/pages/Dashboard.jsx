@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { API } from '../App';
+import { API } from '../lib/api';
+import { toast } from 'sonner';
+import StatusBadge from '../components/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import {
   FolderKanban,
   Building2,
@@ -21,17 +22,21 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchStats = async () => {
       try {
-        const response = await API.get('/dashboard/stats');
+        const response = await API.get('/dashboard/stats', { signal: controller.signal });
         setStats(response.data);
       } catch (error) {
-        console.error('Failed to fetch dashboard stats:', error);
+        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+          toast.error('Eroare la încărcarea datelor din panou');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchStats();
+    return () => controller.abort();
   }, []);
 
   if (loading) {
@@ -258,32 +263,6 @@ export default function Dashboard() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const labels = {
-    draft: 'Ciornă',
-    sent: 'Trimisă',
-    closed: 'Închisă',
-    received: 'Primită',
-    validated: 'Validată',
-    archived: 'Arhivată',
-  };
-  
-  const styles = {
-    draft: 'bg-slate-100 text-slate-700',
-    sent: 'bg-blue-100 text-blue-700',
-    closed: 'bg-slate-100 text-slate-600',
-    received: 'bg-amber-100 text-amber-700',
-    validated: 'bg-emerald-100 text-emerald-700',
-    archived: 'bg-slate-100 text-slate-500',
-  };
-
-  return (
-    <Badge variant="secondary" className={styles[status] || styles.draft}>
-      {labels[status] || status}
-    </Badge>
   );
 }
 

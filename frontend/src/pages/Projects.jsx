@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { API } from '../App';
+import { API } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -51,7 +51,7 @@ export default function Projects() {
     description: '',
   });
 
-  const fetchProjects = async (page = 1, status = '') => {
+  const fetchProjects = useCallback(async (page = 1, status = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
@@ -69,11 +69,11 @@ export default function Projects() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProjects(1, statusFilter);
-  }, [statusFilter]);
+  }, [fetchProjects, statusFilter]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

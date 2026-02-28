@@ -21,10 +21,10 @@ public class PasswordService {
         if (raw == null || stored == null || stored.isBlank()) {
             return false;
         }
-        if (isBcrypt(stored)) {
-            return encoder.matches(raw, stored);
+        if (!isBcrypt(stored)) {
+            throw new IllegalStateException("Stored password is not bcrypt-hashed. Rehash all passwords before use.");
         }
-        return stored.equals(raw);
+        return encoder.matches(raw, stored);
     }
 
     public boolean isBcrypt(String value) {

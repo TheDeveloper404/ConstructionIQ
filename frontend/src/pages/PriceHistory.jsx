@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { API } from '../App';
+import { API, fetchAllPages } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
   Select,
@@ -30,39 +30,49 @@ export default function PriceHistory() {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState('90');
 
+  const selectedProductRef = useRef(selectedProduct);
+
   useEffect(() => {
+    const controller = new AbortController();
     const fetchProducts = async () => {
       try {
-        const response = await API.get('/catalog/products?page_size=100');
-        setProducts(response.data.items);
-        
-        if (!selectedProduct && response.data.items.length > 0) {
-          setSelectedProduct(response.data.items[0].id);
+        const items = await fetchAllPages('/catalog/products');
+        setProducts(items);
+        if (!selectedProductRef.current && items.length > 0) {
+          setSelectedProduct(items[0].id);
         }
       } catch (error) {
-        toast.error('Eroare la încărcarea produselor');
+        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+          toast.error('Eroare la încărcarea produselor');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchProducts();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
-    if (selectedProduct) {
-      fetchPriceHistory();
-      setSearchParams({ product: selectedProduct });
-    }
-  }, [selectedProduct, days]);
-
-  const fetchPriceHistory = async () => {
-    try {
-      const response = await API.get(`/price-history/product/${selectedProduct}?days=${days}`);
-      setPriceData(response.data);
-    } catch (error) {
-      toast.error('Eroare la încărcarea istoricului prețurilor');
-    }
-  };
+    if (!selectedProduct) return;
+    const controller = new AbortController();
+    const fetchPriceHistory = async () => {
+      try {
+        const response = await API.get(
+          `/price-history/product/${selectedProduct}?days=${days}`,
+          { signal: controller.signal }
+        );
+        setPriceData(response.data);
+        setSearchParams({ product: selectedProduct });
+      } catch (error) {
+        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+          toast.error('Eroare la încărcarea istoricului prețurilor');
+        }
+      }
+    };
+    fetchPriceHistory();
+    return () => controller.abort();
+  }, [selectedProduct, days, setSearchParams]);
 
   const formatChartData = () => {
     if (!priceData?.price_points?.length) return [];

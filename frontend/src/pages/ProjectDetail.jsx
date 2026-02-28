@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { API } from '../App';
+import { API } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Badge } from '../components/ui/badge';
+import StatusBadge from '../components/StatusBadge';
 import {
   Select,
   SelectContent,
@@ -75,24 +75,6 @@ export default function ProjectDetail() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const labels = {
-      active: 'Activ',
-      completed: 'Finalizat',
-      on_hold: 'În Așteptare',
-    };
-    const styles = {
-      active: 'bg-emerald-100 text-emerald-700',
-      completed: 'bg-slate-100 text-slate-700',
-      on_hold: 'bg-amber-100 text-amber-700',
-    };
-    return (
-      <Badge variant="secondary" className={styles[status] || styles.active}>
-        {labels[status] || status}
-      </Badge>
-    );
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -119,7 +101,7 @@ export default function ProjectDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-heading font-bold">{project?.name}</h1>
-            {getStatusBadge(project?.status)}
+            <StatusBadge status={project?.status} />
           </div>
           <p className="text-muted-foreground">Detalii Proiect</p>
         </div>

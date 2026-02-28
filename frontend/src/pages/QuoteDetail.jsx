@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { API } from '../App';
+import { API, fetchAllPages } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -31,32 +31,34 @@ export default function QuoteDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchData = async () => {
       try {
-        const [quoteRes, productsRes] = await Promise.all([
-          API.get(`/quotes/${id}`),
-          API.get('/catalog/products?page_size=100'),
+        const [quoteRes, productsList] = await Promise.all([
+          API.get(`/quotes/${id}`, { signal: controller.signal }),
+          fetchAllPages('/catalog/products'),
         ]);
         setQuote(quoteRes.data);
-        
+
         const productMap = {};
-        productsRes.data.items.forEach((p) => {
-          productMap[p.id] = p;
-        });
+        productsList.forEach((p) => { productMap[p.id] = p; });
         setProducts(productMap);
-        
+
         if (quoteRes.data.supplier_id) {
-          const supplierRes = await API.get(`/suppliers/${quoteRes.data.supplier_id}`);
+          const supplierRes = await API.get(`/suppliers/${quoteRes.data.supplier_id}`, { signal: controller.signal });
           setSupplier(supplierRes.data);
         }
       } catch (error) {
-        toast.error('Eroare la încărcarea ofertei');
-        navigate('/quotes');
+        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+          toast.error('Eroare la încărcarea ofertei');
+          navigate('/quotes');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
+    return () => controller.abort();
   }, [id, navigate]);
 
   const handleStatusChange = async (newStatus) => {

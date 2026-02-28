@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { API } from '../App';
+import { API } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -40,7 +40,7 @@ export default function Suppliers() {
     notes: '',
   });
 
-  const fetchSuppliers = async (page = 1, searchQuery = '') => {
+  const fetchSuppliers = useCallback(async (page = 1, searchQuery = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
@@ -58,11 +58,11 @@ export default function Suppliers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchSuppliers(1, search);
-  }, []);
+    fetchSuppliers(1, '');
+  }, [fetchSuppliers]);
 
   const handleSearch = (e) => {
     e.preventDefault();
